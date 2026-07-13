@@ -9,7 +9,7 @@
 // @supportURL   https://github.com/Mattease/performer-agent-study-helper/issues
 // @updateURL    https://raw.githubusercontent.com/Mattease/performer-agent-study-helper/main/performer-agent-study-helper.user.js
 // @downloadURL  https://raw.githubusercontent.com/Mattease/performer-agent-study-helper/main/performer-agent-study-helper.user.js
-// @icon         https://www.mct.gov.cn/favicon.ico
+// @icon         data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🎭%3C/text%3E%3C/svg%3E
 // @match        *://*.mct.gov.cn/*
 // @match        *://ccm.mct.gov.cn/*
 // @match        *://wlsc.mr.mct.gov.cn/*
@@ -532,20 +532,48 @@
             document.body.appendChild(panel);
 
             // 交互绑定：只通过齿轮按钮切换面板
+            let autoHideTimer = null;
+
+            function startAutoHide() {
+                clearTimeout(autoHideTimer);
+                autoHideTimer = setTimeout(() => {
+                    panel.classList.remove('open');
+                }, 7000);
+            }
+
+            function resetAutoHide() {
+                if (panel.classList.contains('open')) {
+                    startAutoHide();
+                }
+            }
+
             gear.addEventListener('click', (e) => {
                 e.stopPropagation();
                 panel.classList.toggle('open');
+                if (panel.classList.contains('open')) {
+                    startAutoHide();
+                } else {
+                    clearTimeout(autoHideTimer);
+                }
             });
 
-            // 阻止面板内部点击事件冒泡到页面（防止页面其他逻辑干扰面板）
+            // 面板内有交互时重置自动隐藏计时器
             panel.addEventListener('click', (e) => {
                 e.stopPropagation();
+                resetAutoHide();
             });
             panel.addEventListener('mousedown', (e) => {
                 e.stopPropagation();
+                resetAutoHide();
             });
             panel.addEventListener('mouseup', (e) => {
                 e.stopPropagation();
+            });
+            panel.addEventListener('mousemove', () => {
+                resetAutoHide();
+            });
+            panel.addEventListener('input', () => {
+                resetAutoHide();
             });
 
             const speedInput = document.getElementById('gk-speed-input');
