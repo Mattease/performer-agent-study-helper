@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         演出经纪人继续教育学习助手
+// @name         继续教育学习助手
 // @namespace    https://github.com/Mattease/performer-agent-study-helper
 // @version      3.0.0
-// @description  文旅部演出经纪人继续教育平台辅助工具。支持视频倍速播放、后台防暂停、自动处理学习提示弹窗。仅供个人学习效率提升使用。
+// @description  某继续教育平台辅助工具。支持视频倍速播放、后台防暂停、自动处理学习提示弹窗。仅供个人学习效率提升使用。
 // @author       Mattease
 // @license      MIT
 // @homepage     https://github.com/Mattease/performer-agent-study-helper
@@ -538,7 +538,7 @@
                 clearTimeout(autoHideTimer);
                 autoHideTimer = setTimeout(() => {
                     panel.classList.remove('open');
-                }, 7000);
+                }, 5000);
             }
 
             function resetAutoHide() {
