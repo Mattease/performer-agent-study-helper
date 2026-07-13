@@ -134,7 +134,7 @@
         }, 800);
         timers.push(mainTimer);
 
-        // 2b. 弹窗自动处理
+        // 2b. 弹窗自动处理（采用宽泛扫描策略，因为 @match 已限定目标平台域名）
         const popupTimer = setInterval(() => {
             try {
                 if (isPaused) return;
@@ -145,94 +145,57 @@
                     '继续学习', '关闭提示', '关闭', '知道了', '开始学习',
                     '继续播放', '已阅读', '播放', '下一课'];
 
-                // 危险词排除名单 — 防止误点
+                // 危险词排除名单
                 const excludeKeywords = ['删除', '退出', '注销', '转账', '支付',
                     '提交订单', '取消资格', '放弃', '注销账号'];
 
-                // 辅助函数：检查元素或其祖先是否有高 z-index（说明是浮层弹窗）
-                function hasHighZIndexAncestor(el) {
-                    let node = el;
-                    let depth = 0;
-                    while (node && node !== document.body && depth < 10) {
-                        const z = parseInt(window.getComputedStyle(node).zIndex);
-                        if (!isNaN(z) && z > 10) return true;
-                        // 检查 position 是否脱离文档流
-                        const pos = window.getComputedStyle(node).position;
-                        if (pos === 'fixed' || (pos === 'absolute' && depth > 0)) return true;
-                        node = node.parentElement;
-                        depth++;
-                    }
-                    return false;
-                }
+                // 上下文关键词 — 页面中出现这些文字说明有弹窗
+                const contextKeywords = ['播放提示', '自动播放下一节', '播放完成',
+                    '学习提示', '继续学习', '课程提示', '温馨提示', '提示信息',
+                    '您已经学完', '播放结束', '是否继续'];
 
-                // 辅助函数：检查元素是否在我们脚本的 GUI 内
-                function isOurGUI(el) {
-                    return el.closest('#gk-helper-panel') || el.closest('#gk-helper-gear');
-                }
-
-                // 弹窗容器选择器（尽量全面覆盖各种前端框架）
-                const dialogSelectors = [
-                    '[class*="dialog"]', '[class*="modal"]', '[class*="popup"]',
-                    '[class*="Dialog"]', '[class*="Modal"]', '[class*="Popup"]',
-                    '[class*="overlay"]', '[class*="Overlay"]', '[class*="alert"]',
-                    '[class*="layer"]', '[class*="Layer"]', '[class*="mask"]',
-                    '[class*="toast"]', '[class*="Toast"]', '[class*="tip"]',
-                    '[class*="notice"]', '[class*="Notice"]', '[class*="confirm"]',
-                    '[class*="Confirm"]', '[class*="prompt"]', '[class*="Prompt"]',
-                    '[class*="msgbox"]', '[class*="message-box"]',
-                    '[role="dialog"]', '[role="alertdialog"]',
-                    '.el-dialog', '.ant-modal', '.layui-layer',
-                    '.el-message-box', '.van-dialog', '.ivu-modal'
-                ];
-
-                let handled = false;
-
-                // === 方案一：在已知弹窗容器内查找按钮 ===
-                const dialogContainers = document.querySelectorAll(dialogSelectors.join(', '));
-                dialogContainers.forEach(container => {
-                    if (handled || isOurGUI(container)) return;
-                    // 确认容器可见
-                    if (container.offsetWidth === 0 && container.offsetHeight === 0) return;
-                    const cs = window.getComputedStyle(container);
-                    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') return;
-
-                    const buttons = container.querySelectorAll(
-                        'button, a, [class*="btn"], [class*="Btn"], [role="button"], input[type="button"], input[type="submit"]'
-                    );
-                    buttons.forEach(el => {
-                        if (handled) return;
-                        if (el.offsetWidth > 0 && el.offsetHeight > 0 && el.innerText) {
-                            const text = el.innerText.trim();
-                            if (text.length > 0 && text.length < 15) {
-                                if (excludeKeywords.some(k => text.includes(k))) return;
-                                if (keywords.some(k => text === k || text.includes(k))) {
-                                    log('弹窗容器内捕获按钮:', text);
-                                    el.click();
-                                    handled = true;
-                                }
-                            }
-                        }
-                    });
-                });
-                if (handled) return;
-
-                // === 方案二：扫描所有可见按钮，通过祖先 z-index 判断是否在浮层中 ===
-                const allButtons = document.querySelectorAll(
-                    'button, a[class*="btn"], a[class*="Btn"], [role="button"], input[type="button"], input[type="submit"]'
+                // 宽泛扫描：包括 div、span、a（很多平台用 div/span 做按钮）
+                const targets = document.querySelectorAll(
+                    'button, [class*="btn"], [id*="btn"], a, div, span'
                 );
-                allButtons.forEach(el => {
-                    if (handled) return;
-                    if (isOurGUI(el)) return;
+
+                targets.forEach(el => {
+                    // 跳过我们自己的 GUI
+                    if (el.closest('#gk-helper-panel') || el.closest('#gk-helper-gear')) return;
+
                     if (el.offsetWidth > 0 && el.offsetHeight > 0 && el.innerText) {
                         const text = el.innerText.trim();
-                        if (text.length > 0 && text.length < 15) {
+
+                        if (text.length > 0 && text.length < 10) {
+                            // 排除危险操作
                             if (excludeKeywords.some(k => text.includes(k))) return;
+
                             if (keywords.some(k => text === k)) {
-                                // 检查这个按钮是否在一个浮层中
-                                if (hasHighZIndexAncestor(el)) {
-                                    log('浮层按钮捕获:', text);
+                                // 上下文判断：页面文本中包含弹窗关键词，或元素在弹窗容器/浮层中
+                                const pageText = document.body.textContent || '';
+                                const hasContext =
+                                    // 页面文本上下文检测
+                                    contextKeywords.some(ck => pageText.includes(ck)) ||
+                                    // 弹窗容器 class 检测
+                                    el.closest('[class*="dialog"]') ||
+                                    el.closest('[class*="modal"]') ||
+                                    el.closest('[class*="popup"]') ||
+                                    el.closest('[class*="layer"]') ||
+                                    el.closest('[class*="overlay"]') ||
+                                    el.closest('[class*="mask"]') ||
+                                    el.closest('[class*="alert"]') ||
+                                    el.closest('[class*="confirm"]') ||
+                                    el.closest('[class*="tip"]') ||
+                                    el.closest('[role="dialog"]') ||
+                                    el.closest('[role="alertdialog"]') ||
+                                    // 浮层样式检测
+                                    window.getComputedStyle(el).position === 'absolute' ||
+                                    window.getComputedStyle(el).position === 'fixed' ||
+                                    parseInt(window.getComputedStyle(el).zIndex) > 10;
+
+                                if (hasContext) {
+                                    log('捕获弹窗按钮:', text);
                                     el.click();
-                                    handled = true;
                                 }
                             }
                         }
@@ -241,7 +204,7 @@
             } catch (err) {
                 warn('弹窗处理出错:', err);
             }
-        }, 1200);
+        }, 1000);
         timers.push(popupTimer);
 
         // 2c. 渲染 GUI
